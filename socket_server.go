@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tidwall/gjson"
 )
 
 func socketServerStart() {
@@ -37,28 +39,30 @@ var lenRead = 128
 
 func handleClient(conn net.Conn) {
 
-
 	defer conn.Close()
 
 	//conn.SetReadDeadline(time.Now().Add(2 * time.Minute))
 	request := make([]byte, lenRead)
-	readLen,err:=conn.Read(request)
-	if err!=nil||readLen==0 {
+	readLen, err := conn.Read(request)
+	if err != nil || readLen == 0 {
 		conn.Close()
 		conn = nil
-		
-	}else{
-		email:=strings.TrimSpace(string(request[:readLen]))
-		addConnToMap(email,conn)
+
+	} else {
+		email := strings.TrimSpace(string(request[:readLen]))
+		addConnToMap(email, conn)
 
 		for {
 			readLen, err := conn.Read(request)
-			if err != nil{
+			if err != nil {
 				conn.Close()
 				conn = nil
+
 				connMapLock.Lock()
-				delete(connMap,email)
+				delete(connMap, email)
+
 				connMapLock.Unlock()
+
 				break
 			}
 			if readLen == 0 {
@@ -66,14 +70,14 @@ func handleClient(conn net.Conn) {
 				break
 			} else {
 				msg := strings.TrimSpace(string(request[:readLen]))
-				fmt.Println("收到 ： "+msg)
+				fmt.Println("收到 ： " + msg)
 				addMsgToQueue(msg)
 			}
 			request = make([]byte, lenRead)
 		}
 
 	}
-	
+
 }
 
 var msgQueueLock sync.Mutex
@@ -88,9 +92,9 @@ func addMsgToQueue(msg string) {
 var connMapLock sync.Mutex
 var connMap map[string]net.Conn
 
-func addConnToMap(email string,conn net.Conn) {
+func addConnToMap(email string, conn net.Conn) {
 	connMapLock.Lock()
-	if connMap==nil {
+	if connMap == nil {
 		connMap = make(map[string]net.Conn)
 	}
 	connMap[email] = conn
@@ -107,18 +111,63 @@ func broadCastMsg() {
 			msgQueueLock.Unlock()
 
 			connMapLock.Lock()
-			for email,conn:=range connMap{
-				if conn==nil {
-					delete(connMap,email)
-				}else{
-					fmt.Println("广播 ： "+msg.Value.(string))
-					conn.Write([]byte(msg.Value.(string)))
+			for email, conn := range connMap {
+				if conn == nil {
+
+					connMapLock.Lock()
+					delete(connMap, email)
+					connMapLock.Unlock()
+
+				} else {
+					fmt.Println("广播 ： " + msg.Value.(string))
+
+					broadCastMsgDo(msg.Value.(string), conn, email)
 				}
 			}
-			
+
 			connMapLock.Unlock()
 		}
 		time.Sleep(1 * time.Second)
 	}
 
+}
+
+//
+func broadCastMsgDo(msg string, conn net.Conn, email string) {
+
+	dataType := gjson.Get(msg, "type")
+
+	if dataType.String() == "0" {
+		//位置数据
+		conn.Write([]byte(msg))
+	} else if dataType.String() == "1" {
+		//广播数据
+		conn.Write([]byte(msg))
+	} else if dataType.String() == "2" {
+		//聊天数据
+		to := gjson.Get(msg, "to")
+		if to.String() == email {
+			conn.Write([]byte(msg))
+		}
+	} else if dataType.String() == "3" {
+		//用户下线
+		conn.Write([]byte(msg))
+		//
+		email := gjson.Get(msg, "email")
+		deleteUserFromDB(email.String())
+	}
+
+}
+
+//从数据库中 把下线的用户删掉
+func deleteUserFromDB(email string) error {
+	if !hasDbInit {
+		initDb()
+	}
+	insForm, err := myDb.Prepare("delete from user where email=?")
+	if err != nil {
+		return err
+	}
+	insForm.Exec(email)
+	return nil
 }
