@@ -15,3 +15,20 @@ type positionData struct {
 	Lng   int64  `json:"lng"`
 	Lat   int64  `json:"lat"`
 }
+
+type sendPositionData struct {
+	Lng   float64 `json:"lng"`
+	Lat   float64 `json:"lat"`
+	Email string `json:"email"`
+}
+
+type sendBroadcastData struct {
+	Broadcast string `json:"broadcast"`
+	Email     string `json:"email"`
+}
+
+type sendChatMsgData struct {
+	Msg  string `json:"msg"`
+	From string `json:"from"`
+	To   string `json:"to"`
+}
