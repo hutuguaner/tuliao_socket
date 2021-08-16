@@ -17,7 +17,7 @@ func socketIOServerStart() {
 
 	server.OnConnect("/", func(s socketio.Conn) error {
 		s.SetContext("")
-		fmt.Println("connected:", s.ID())
+		fmt.Println("connected : ", s.ID())
 		return nil
 	})
 	server.OnEvent("/", sendPosition, func(s socketio.Conn, msg string) {
@@ -42,7 +42,8 @@ func socketIOServerStart() {
 		data := sendBroadcastData{}
 		err := json.Unmarshal(bytes, &data)
 		if err == nil {
-			server.BroadcastToRoom("",all, receiveBroadcast, msg)
+			server.BroadcastToRoom("", all, receiveBroadcast, msg)
+
 		}
 
 	})
@@ -53,7 +54,7 @@ func socketIOServerStart() {
 		data := sendChatMsgData{}
 		err := json.Unmarshal(bytes, &data)
 		if err == nil {
-			server.BroadcastToRoom("",data.To, receiveMsg, msg)
+			server.BroadcastToRoom("", data.To, receiveMsg, msg)
 		}
 
 	})
@@ -62,13 +63,13 @@ func socketIOServerStart() {
 		fmt.Println("meet error:", s.ID())
 		email := s.Context().(string)
 		s.Close()
-		server.BroadcastToRoom("",all, offline, email)
+		server.BroadcastToRoom("", all, offline, email)
 	})
 	server.OnDisconnect("/", func(s socketio.Conn, reason string) {
 		fmt.Println("closed", s.ID())
 		email := s.Context().(string)
 		s.Close()
-		server.BroadcastToRoom("",all, offline, email)
+		server.BroadcastToRoom("", all, offline, email)
 	})
 	go server.Serve()
 	defer server.Close()
